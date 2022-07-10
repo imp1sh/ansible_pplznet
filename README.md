@@ -1,2 +1,3 @@
-# ansible_pplznet
-Ansible Collection to manage pplznet environments, meaning talking to netbox mainly.
+# Ansible Collection - imp1sh.ansible_pplznet
+
+Documentation for the collection.
