@@ -7,7 +7,19 @@
     data:
       name: "{{ pplznet_cluster_name }}"
       region: "pplznet"
+      site_group: "{{ pplznet_cluster_sitegroup|default(omit)}}"
     state: present
+- name: get pplznet global ULA prefix
+  set_fact:
+    pplznet_global_ula: "{{ query('netbox.netbox.nb_lookup', 'prefixes', api_filter='status=active tag=pplznet_global_ula', api_endpoint=pplznet_netbox_url, token=pplznet_netbox_token) }}"
+  register: query_global_ula
+- name: get ULA prefix for cluster from netbox
+  set_fact:
+    pplznet_cluster_ula: "{{ query('netbox.netbox.nb_lookup', 'prefixes', api_filter='region=pplznet site=' ~ pplznet_cluster_name , api_endpoint=pplznet_netbox_url, token=pplznet_netbox_token) }}"
+  register: query_netbox_ula
+    #- name: debug test
+    #  debug:
+    #    msg: "bla {{ pplznet_global_ula[0].value.prefix }}"
 - name: create prefix for cluster
   netbox.netbox.netbox_prefix:
     netbox_url: "{{ pplznet_netbox_url }}"

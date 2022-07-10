@@ -1,0 +1,39 @@
+---
+# tasks file for pplznet-node-deploy
+# Site verification
+- name: query site from netbox
+  set_fact:
+    pplznet_site_data: "{{ query('netbox.netbox.nb_lookup', 'sites', api_filter='status=active region=pplznet name=' ~ pplznet_cluster_name, api_endpoint=pplznet_netbox_url, token=pplznet_netbox_token) }}"
+  register: pplznet_site_data_query
+- name: Verify Site attributes set
+  assert:
+    that:
+      - pplznet_site_data[0].value.group.name | length > 0
+      - pplznet_site_data[0].value.region.name | length > 0
+# Cluster prefix actions
+- name: get ULA prefix for cluster from netbox
+  set_fact:
+    pplznet_cluster_ula: "{{ query('netbox.netbox.nb_lookup', 'prefixes', api_filter='region=pplznet role=pplznet_cluster_ula site=' ~ pplznet_cluster_name , api_endpoint=pplznet_netbox_url, token=pplznet_netbox_token) }}"
+  register: pplznet_cluster_ula_query
+  when: not pplznet_site_data_query.failed
+    ### wenn cluster ula nicht gefunden: 1) sicherstellen, dass übergeordneter ula existiert, dann darin einen ula für cluster erstellen
+    ### aktuell wird über die  pplznet_sitegroup_ula: Variable der übergeordnete ULA über eine VAR händisch festgelegt
+    ### es wäre wünschenswert, wenn dies nicht als veriable erst festgelegt werden müsste, aber gerade unklar
+    ### wie der dazugehörige übergeordnete Präfix zuverlässig gefunden werden kann
+- name: create cluster ula since it was not found
+  netbox.netbox.netbox_prefix:
+    netbox_url: "{{ pplznet_netbox_url }}"
+    netbox_token: "{{ pplznet_netbox_token }}"
+    data:
+      description: "pplznet cluster ula {{ pplznet_cluster_name }}"
+      parent: "{{ pplznet_sitegroup_ula }}"
+      prefix_length: "{{ pplznet_cluster_ula_size }}"
+      site: "{{ pplznet_cluster_name }}"
+      prefix_role: "pplznet_cluster_ula"
+      is_pool: true
+    state: present
+    first_available: yes
+  register: pplznet_prefix_query
+  when:
+    - not pplznet_site_data_query.failed
+    - pplznet_cluster_ula | length == 0

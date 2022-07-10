@@ -1,0 +1,4 @@
+---
+# defaults file for pplznet_node_deploy
+pplznet_cluster_ula_size: 40
+pplznet_node_ula_size: 56
