@@ -15,6 +15,7 @@
     data:
       parent: "{{ pplznet_netbox_rootula }}"
       prefix_length: 32
+      site: 
     state: present
     first_available: yes
   register: prefix_info
