@@ -16,6 +16,12 @@
     pplznet_cluster_ula: "{{ query('netbox.netbox.nb_lookup', 'prefixes', api_filter='region=pplznet role=pplznet_cluster_ula site=' ~ pplznet_cluster_name , api_endpoint=pplznet_netbox_url, token=pplznet_netbox_token) }}"
   register: pplznet_cluster_ula_query
   when: not pplznet_site_data_query.failed
+- name: set found cluster prefix into variable
+  set_fact:
+    pplznet_cluster_ula_specific: "{{ pplznet_cluster_ula[0].value.prefix }}"
+  when:
+    - not pplznet_site_data_query.failed
+    - pplznet_cluster_ula | length != 0
     ### wenn cluster ula nicht gefunden: 1) sicherstellen, dass übergeordneter ula existiert, dann darin einen ula für cluster erstellen
     ### aktuell wird über die  pplznet_sitegroup_ula: Variable der übergeordnete ULA über eine VAR händisch festgelegt
     ### es wäre wünschenswert, wenn dies nicht als veriable erst festgelegt werden müsste, aber gerade unklar
@@ -33,7 +39,48 @@
       is_pool: true
     state: present
     first_available: yes
-  register: pplznet_prefix_query
+  register: pplznet_sitegroup_prefix_query
   when:
     - not pplznet_site_data_query.failed
     - pplznet_cluster_ula | length == 0
+- name: set created cluster prefix into variable
+  set_fact:
+    pplznet_cluster_ula_specific: "{{ pplznet_sitegroup_prefix_query.prefix.prefix }}"
+  when:
+    - not pplznet_site_data_query.failed
+    - pplznet_sitegroup_prefix_query.prefix.prefix is defined
+# Node prefix action
+- name: get ULA prefix for node from netbox
+  set_fact:
+    pplznet_node_ula: "{{ query('netbox.netbox.nb_lookup', 'prefixes', api_filter='region=pplznet role=pplznet_node_ula site=' ~ pplznet_cluster_name ~ ' description__ic=' ~ inventory_hostname, api_endpoint=pplznet_netbox_url, token=pplznet_netbox_token) }}"
+  register: pplznet_node_ula_query
+  when: not pplznet_site_data_query.failed
+- name: set found node prefix into variable
+  set_fact:
+    pplznet_node_ula_specific: "{{ pplznet_node_ula[0].value.prefix }}"
+  when:
+    - not pplznet_site_data_query.failed
+    - pplznet_node_ula | length != 0
+- name: create node ula prefix
+  netbox.netbox.netbox_prefix:
+    netbox_url: "{{ pplznet_netbox_url }}"
+    netbox_token: "{{ pplznet_netbox_token }}"
+    data:
+      description: "pplznet cluster {{ pplznet_cluster_name }} node ula {{ inventory_hostname }}"
+      parent: "{{ pplznet_cluster_ula_specific }}"
+      prefix_length: "{{ pplznet_node_ula_size }}"
+      site: "{{ pplznet_cluster_name }}"
+      prefix_role: "pplznet_node_ula"
+      is_pool: true
+    state: present
+    first_available: yes
+  register: pplznet_node_prefix_query
+  when:
+    - not pplznet_site_data_query.failed
+    - pplznet_node_ula | length == 0
+- name: set created node prefix into variable
+  set_fact:
+    pplznet_node_ula_specific: "{{ pplznet_node_prefix_query.prefix.prefix }}"
+  when:
+    - not pplznet_site_data_query.failed
+    - pplznet_node_prefix_query.prefix.prefix is defined
