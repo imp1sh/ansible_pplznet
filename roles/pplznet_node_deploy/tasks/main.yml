@@ -1,19 +1,26 @@
 ---
 # tasks file for pplznet-node-deploy
-# Site verification
-- name: query site from netbox
-  set_fact:
-    pplznet_site_data: "{{ query('netbox.netbox.nb_lookup', 'sites', api_filter='status=active region=pplznet name=' ~ pplznet_cluster_name, api_endpoint=pplznet_netbox_url, token=pplznet_netbox_token) }}"
+# Site action
+#- name: query site from netbox
+#  set_fact:
+#    pplznet_site_data: "{{ query('netbox.netbox.nb_lookup', 'sites', api_filter='status=active region=pplznet group=pplznet_cluster_' ~ pplznet_cluster_name ~ ' name=' ~ inventory_hostname, api_endpoint=pplznet_netbox_url, token=pplznet_netbox_token) }}"
+#  register: pplznet_site_data_query
+- name: create site for node with the name of the node
+  netbox.netbox.netbox_site:
+    netbox_url: "{{ pplznet_netbox_url }}"
+    netbox_token: "{{ pplznet_netbox_token }}"
+    data:
+      name: "{{ inventory_hostname }}"
+      region: "pplznet"
+      site_group: "pplznet_cluster_{{ pplznet_cluster_name }}"
   register: pplznet_site_data_query
-- name: Verify Site attributes set
-  assert:
-    that:
-      - pplznet_site_data[0].value.group.name | length > 0
-      - pplznet_site_data[0].value.region.name | length > 0
+- name: debug 0
+  debug:
+    var: pplznet_site_name_query
 # Cluster prefix actions
 - name: get ULA prefix for cluster from netbox
   set_fact:
-    pplznet_cluster_ula: "{{ query('netbox.netbox.nb_lookup', 'prefixes', api_filter='region=pplznet role=pplznet_cluster_ula site=' ~ pplznet_cluster_name , api_endpoint=pplznet_netbox_url, token=pplznet_netbox_token) }}"
+    pplznet_cluster_ula: "{{ query('netbox.netbox.nb_lookup', 'prefixes', api_filter='region=pplznet site=pplznet_cluster_' ~ pplznet_cluster_name, api_endpoint=pplznet_netbox_url, token=pplznet_netbox_token) }}"
   register: pplznet_cluster_ula_query
   when: not pplznet_site_data_query.failed
 - name: set found cluster prefix into variable
@@ -34,7 +41,7 @@
       description: "pplznet cluster ula {{ pplznet_cluster_name }}"
       parent: "{{ pplznet_sitegroup_ula }}"
       prefix_length: "{{ pplznet_cluster_ula_size }}"
-      site: "{{ pplznet_cluster_name }}"
+      site: "pplznet_cluster_{{ pplznet_cluster_name }}"
       prefix_role: "pplznet_cluster_ula"
       is_pool: true
     state: present
@@ -52,7 +59,7 @@
 # Node prefix action
 - name: get ULA prefix for node from netbox
   set_fact:
-    pplznet_node_ula: "{{ query('netbox.netbox.nb_lookup', 'prefixes', api_filter='region=pplznet role=pplznet_node_ula site=' ~ pplznet_cluster_name ~ ' description__ic=' ~ inventory_hostname, api_endpoint=pplznet_netbox_url, token=pplznet_netbox_token) }}"
+    pplznet_node_ula: "{{ query('netbox.netbox.nb_lookup', 'prefixes', api_filter='region=pplznet role=pplznet_node_ula site=' ~ inventory_hostname|replace('.','-'), api_endpoint=pplznet_netbox_url, token=pplznet_netbox_token) }}"
   register: pplznet_node_ula_query
   when: not pplznet_site_data_query.failed
 - name: set found node prefix into variable
@@ -69,7 +76,7 @@
       description: "pplznet cluster {{ pplznet_cluster_name }} node ula {{ inventory_hostname }}"
       parent: "{{ pplznet_cluster_ula_specific }}"
       prefix_length: "{{ pplznet_node_ula_size }}"
-      site: "{{ pplznet_cluster_name }}"
+      site: "{{ inventory_hostname }}"
       prefix_role: "pplznet_node_ula"
       is_pool: true
     state: present
