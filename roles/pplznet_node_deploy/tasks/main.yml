@@ -14,9 +14,6 @@
       region: "pplznet"
       site_group: "pplznet_cluster_{{ pplznet_cluster_name }}"
   register: pplznet_site_data_query
-- name: debug 0
-  debug:
-    var: pplznet_site_name_query
 # Cluster prefix actions
 - name: get ULA prefix for cluster from netbox
   set_fact:
